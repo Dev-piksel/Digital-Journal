@@ -121,12 +121,24 @@
 	}
 
 	function generateRandomPassword(): string {
-		const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*';
-		let pass = '';
-		for (let i = 0; i < 12; i++) {
-			pass += chars.charAt(Math.floor(Math.random() * chars.length));
+		const lower = 'abcdefghjkmnpqrstuvwxyz';
+		const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+		const numbers = '23456789';
+		const symbols = '!@#$%&*';
+		const all = lower + upper + numbers + symbols;
+
+		const pass = [
+			lower.charAt(Math.floor(Math.random() * lower.length)),
+			upper.charAt(Math.floor(Math.random() * upper.length)),
+			numbers.charAt(Math.floor(Math.random() * numbers.length)),
+			symbols.charAt(Math.floor(Math.random() * symbols.length))
+		];
+
+		for (let i = 4; i < 12; i++) {
+			pass.push(all.charAt(Math.floor(Math.random() * all.length)));
 		}
-		return pass;
+
+		return pass.sort(() => Math.random() - 0.5).join('');
 	}
 
 	// --- CREATE USER ---

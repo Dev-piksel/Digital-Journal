@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getUserByUsername, createUser, createSession } from '#lib/server/db';
+import { getPasswordValidationErrorMessage } from '#lib/utils/password';
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	try {
@@ -19,8 +20,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			);
 		}
 
-		if (!password || password.length < 6) {
-			return json({ error: 'Password must be at least 6 characters long.' }, { status: 400 });
+		const passwordError = getPasswordValidationErrorMessage(password);
+		if (passwordError) {
+			return json({ error: passwordError }, { status: 400 });
 		}
 
 		const existing = getUserByUsername(cleanUsername);

@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type { User } from '#lib/types';
 	import { toast } from '#lib/utils/toast.svelte';
+	import {
+		checkPasswordRequirements,
+		calculatePasswordStrength,
+		getPasswordValidationErrorMessage
+	} from '#lib/utils/password';
 
 	interface Props {
 		onSuccess: (user: User) => void;
@@ -13,14 +18,31 @@
 	let displayName = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
+	let showPassword = $state(false);
+	let showConfirmPassword = $state(false);
 	let errorMessage = $state('');
 	let isSubmitting = $state(false);
+
+	// Reactive password requirements and strength
+	let reqs = $derived(checkPasswordRequirements(password));
+	let strength = $derived(calculatePasswordStrength(password));
+	let passwordsMatch = $derived(confirmPassword.length > 0 && password === confirmPassword);
+	let passwordsMismatch = $derived(confirmPassword.length > 0 && password !== confirmPassword);
 
 	function fillDemoAccount(demoUsername: string, demoPass: string) {
 		mode = 'login';
 		username = demoUsername;
 		password = demoPass;
+		showPassword = false;
+		showConfirmPassword = false;
 		errorMessage = '';
+	}
+
+	function switchMode(newMode: 'login' | 'register') {
+		mode = newMode;
+		errorMessage = '';
+		showPassword = false;
+		showConfirmPassword = false;
 	}
 
 	async function handleSubmit(e: Event) {
@@ -33,8 +55,9 @@
 		}
 
 		if (mode === 'register') {
-			if (password.length < 6) {
-				errorMessage = 'Password must be at least 6 characters.';
+			const pwError = getPasswordValidationErrorMessage(password);
+			if (pwError) {
+				errorMessage = pwError;
 				return;
 			}
 			if (password !== confirmPassword) {
@@ -118,20 +141,14 @@
 		<button
 			type="button"
 			class="mode-btn {mode === 'login' ? 'active' : ''}"
-			onclick={() => {
-				mode = 'login';
-				errorMessage = '';
-			}}
+			onclick={() => switchMode('login')}
 		>
 			Sign In
 		</button>
 		<button
 			type="button"
 			class="mode-btn {mode === 'register' ? 'active' : ''}"
-			onclick={() => {
-				mode = 'register';
-				errorMessage = '';
-			}}
+			onclick={() => switchMode('register')}
 		>
 			New Account
 		</button>
@@ -176,27 +193,163 @@
 
 		<div class="form-group">
 			<label for="auth-password">Password</label>
-			<input
-				type="password"
-				id="auth-password"
-				placeholder={mode === 'register' ? 'At least 6 characters' : 'Enter your password'}
-				bind:value={password}
-				required
-				autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
-			/>
+			<div class="password-input-wrap">
+				<input
+					type={showPassword ? 'text' : 'password'}
+					id="auth-password"
+					placeholder={mode === 'register' ? 'Min. 8 characters' : 'Enter your password'}
+					bind:value={password}
+					required
+					autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
+				/>
+				<button
+					type="button"
+					class="pw-toggle-btn"
+					onclick={() => (showPassword = !showPassword)}
+					title={showPassword ? 'Hide password' : 'Show password'}
+					aria-label={showPassword ? 'Hide password' : 'Show password'}
+				>
+					{#if showPassword}
+						<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+							<line x1="1" y1="1" x2="23" y2="23"></line>
+						</svg>
+					{:else}
+						<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+							<circle cx="12" cy="12" r="3"></circle>
+						</svg>
+					{/if}
+				</button>
+			</div>
 		</div>
 
 		{#if mode === 'register'}
+			<!-- Password Requirements & Strength Indicator -->
+			<div class="pw-requirements-box">
+				<div class="pw-requirements-header">
+					<span class="pw-req-title">Password Requirements:</span>
+					{#if password.length > 0}
+						<span class="pw-strength-badge" style="color: {strength.color};">
+							Strength: <strong>{strength.label}</strong>
+						</span>
+					{/if}
+				</div>
+
+				{#if password.length > 0}
+					<div class="pw-meter-bar">
+						<div
+							class="pw-meter-fill"
+							style="width: {(strength.score / 5) * 100}%; background-color: {strength.color};"
+						></div>
+					</div>
+				{/if}
+
+				<div class="pw-requirements-grid">
+					<div class="pw-req-item" class:met={reqs.minLength}>
+						{#if reqs.minLength}
+							<svg class="pw-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						{:else}
+							<span class="pw-dot"></span>
+						{/if}
+						<span>At least 8 characters</span>
+					</div>
+
+					<div class="pw-req-item" class:met={reqs.hasUpper}>
+						{#if reqs.hasUpper}
+							<svg class="pw-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						{:else}
+							<span class="pw-dot"></span>
+						{/if}
+						<span>Uppercase letter (A-Z)</span>
+					</div>
+
+					<div class="pw-req-item" class:met={reqs.hasLower}>
+						{#if reqs.hasLower}
+							<svg class="pw-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						{:else}
+							<span class="pw-dot"></span>
+						{/if}
+						<span>Lowercase letter (a-z)</span>
+					</div>
+
+					<div class="pw-req-item" class:met={reqs.hasNumber}>
+						{#if reqs.hasNumber}
+							<svg class="pw-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						{:else}
+							<span class="pw-dot"></span>
+						{/if}
+						<span>At least 1 number (0-9)</span>
+					</div>
+
+					<div class="pw-req-item" class:met={reqs.hasSpecial}>
+						{#if reqs.hasSpecial}
+							<svg class="pw-check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+						{:else}
+							<span class="pw-dot"></span>
+						{/if}
+						<span>Special symbol (!@#$%^&*...)</span>
+					</div>
+				</div>
+			</div>
+
 			<div class="form-group">
 				<label for="auth-confirm-password">Confirm Password</label>
-				<input
-					type="password"
-					id="auth-confirm-password"
-					placeholder="Repeat your password"
-					bind:value={confirmPassword}
-					required
-					autocomplete="new-password"
-				/>
+				<div class="password-input-wrap">
+					<input
+						type={showConfirmPassword ? 'text' : 'password'}
+						id="auth-confirm-password"
+						placeholder="Repeat your password"
+						bind:value={confirmPassword}
+						required
+						autocomplete="new-password"
+					/>
+					<button
+						type="button"
+						class="pw-toggle-btn"
+						onclick={() => (showConfirmPassword = !showConfirmPassword)}
+						title={showConfirmPassword ? 'Hide password' : 'Show password'}
+						aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+					>
+						{#if showConfirmPassword}
+							<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+								<line x1="1" y1="1" x2="23" y2="23"></line>
+							</svg>
+						{:else}
+							<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+								<circle cx="12" cy="12" r="3"></circle>
+							</svg>
+						{/if}
+					</button>
+				</div>
+				{#if confirmPassword.length > 0}
+					<div class="pw-match-badge" class:matched={passwordsMatch} class:mismatch={passwordsMismatch}>
+						{#if passwordsMatch}
+							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+							<span>Passwords match</span>
+						{:else}
+							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="18" y1="6" x2="6" y2="18"></line>
+								<line x1="6" y1="6" x2="18" y2="18"></line>
+							</svg>
+							<span>Passwords do not match yet</span>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -342,10 +495,140 @@
 		color: var(--mu);
 	}
 
+	/* Password Input Wrap & Toggle */
+	.password-input-wrap {
+		position: relative;
+		display: flex;
+		align-items: center;
+		width: 100%;
+	}
+
+	.password-input-wrap input {
+		width: 100%;
+		padding-right: 42px;
+	}
+
+	.pw-toggle-btn {
+		position: absolute;
+		right: 8px;
+		top: 50%;
+		transform: translateY(-50%);
+		background: transparent;
+		border: none;
+		color: var(--mu);
+		cursor: pointer;
+		padding: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 6px;
+		transition: color 0.15s ease, background 0.15s ease;
+	}
+
+	.pw-toggle-btn:hover {
+		color: var(--tx);
+		background: rgba(255, 255, 255, 0.07);
+	}
+
+	/* Password Requirements Box */
+	.pw-requirements-box {
+		background: var(--in);
+		border: 1px solid var(--bd);
+		border-radius: 12px;
+		padding: 11px 13px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.pw-requirements-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 11.5px;
+	}
+
+	.pw-req-title {
+		font-weight: 600;
+		color: var(--mu);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.pw-strength-badge {
+		font-size: 11.5px;
+		font-weight: 600;
+	}
+
+	.pw-meter-bar {
+		width: 100%;
+		height: 4px;
+		background: var(--bd);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.pw-meter-fill {
+		height: 100%;
+		border-radius: 999px;
+		transition: width 0.25s ease, background-color 0.25s ease;
+	}
+
+	.pw-requirements-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 5px;
+	}
+
+	.pw-req-item {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		font-size: 12px;
+		color: var(--mu);
+		transition: color 0.15s ease;
+	}
+
+	.pw-req-item.met {
+		color: #10b981;
+		font-weight: 500;
+	}
+
+	.pw-check-icon {
+		stroke: #10b981;
+		flex-shrink: 0;
+	}
+
+	.pw-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: var(--bd);
+		margin: 4px;
+		flex-shrink: 0;
+	}
+
+	/* Match badge */
+	.pw-match-badge {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		margin-top: 3px;
+	}
+
+	.pw-match-badge.matched {
+		color: #10b981;
+	}
+
+	.pw-match-badge.mismatch {
+		color: var(--dg);
+	}
+
 	.auth-submit-btn {
 		width: 100%;
 		padding: 11px;
 		font-size: 15px;
-		margin-top: 8px;
+		margin-top: 6px;
 	}
 </style>
