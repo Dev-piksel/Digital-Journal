@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { MoodType } from '#lib/types';
 	import { MOODS } from '#lib/types';
+	import { toast } from '#lib/utils/toast.svelte';
 
 	interface Props {
 		id?: string;
@@ -74,7 +75,18 @@
 	}
 
 	async function handleSubmit() {
-		if (!currentTitle.trim() && !currentContent.trim()) {
+		if (!currentTitle.trim()) {
+			toast.show('Title is required for your entry.', 'danger');
+			if (typeof document !== 'undefined') {
+				const titleInput = document.getElementById('entry-title');
+				if (titleInput) titleInput.focus();
+			}
+			return;
+		}
+
+		if (!currentContent.trim()) {
+			toast.show('Please write some content for your entry.', 'danger');
+			if (textareaEl) textareaEl.focus();
 			return;
 		}
 
@@ -125,9 +137,10 @@
 	<input
 		type="text"
 		id="entry-title"
-		placeholder="Title (optional)"
+		placeholder="Entry Title (required)"
 		bind:value={currentTitle}
 		class="title-input"
+		required
 	/>
 
 	<div class="tb-wrapper">
@@ -228,7 +241,7 @@
 				type="button"
 				class="btn pri submit-btn"
 				onclick={handleSubmit}
-				disabled={isSaving || (!currentTitle.trim() && !currentContent.trim())}
+				disabled={isSaving || !currentTitle.trim() || !currentContent.trim()}
 			>
 				{#if isSaving}
 					Saving...

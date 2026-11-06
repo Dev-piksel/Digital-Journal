@@ -30,6 +30,10 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		const body = await request.json();
 		const { title, content, mood, tags } = body;
 
+		if (title !== undefined && !String(title).trim()) {
+			return json({ error: 'Title is required and cannot be empty.' }, { status: 400 });
+		}
+
 		const updated = updateEntry(params.id, locals.user.id, {
 			title,
 			content,

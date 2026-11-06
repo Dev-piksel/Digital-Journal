@@ -43,8 +43,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const body = await request.json();
 		const { title = '', content = '', mood = 'calm', tags = [] } = body;
 
-		if (!title.trim() && !content.trim()) {
-			return json({ error: 'Title or content is required.' }, { status: 400 });
+		if (!title.trim()) {
+			return json({ error: 'Title is required.' }, { status: 400 });
+		}
+
+		if (!content.trim()) {
+			return json({ error: 'Content is required.' }, { status: 400 });
 		}
 
 		const entry = createEntry(locals.user.id, {

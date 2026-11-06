@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getUserById, adminResetUserPassword } from '#lib/server/db';
 
-export const POST: RequestHandler = async ({ params, request, locals }) => {
+export const POST: RequestHandler = async ({ params, request, locals, cookies }) => {
 	if (!locals.user || locals.user.role !== 'admin') {
 		return json({ error: 'Access denied. Admin privileges required.' }, { status: 403 });
 	}
@@ -20,7 +20,12 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			return json({ error: 'New password must be at least 6 characters long.' }, { status: 400 });
 		}
 
-		const success = adminResetUserPassword(params.id, newPassword);
+		const currentToken = cookies.get('journal_session');
+		const success = adminResetUserPassword(
+			params.id,
+			newPassword,
+			locals.user.id === params.id ? currentToken : undefined
+		);
 		if (!success) {
 			return json({ error: 'Failed to update user password.' }, { status: 500 });
 		}

@@ -8,11 +8,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		const body = await request.json();
 		const { username = '', password = '' } = body;
 
-		if (!username.trim() || !password) {
+		const cleanUsername = username.trim().toLowerCase();
+		if (!cleanUsername || !password) {
 			return json({ error: 'Username and password are required.' }, { status: 400 });
 		}
 
-		const userRecord = getUserByUsername(username.trim());
+		const userRecord = getUserByUsername(cleanUsername);
 		if (!userRecord) {
 			return json({ error: 'Invalid username or password.' }, { status: 401 });
 		}

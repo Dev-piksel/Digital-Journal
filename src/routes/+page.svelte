@@ -14,29 +14,39 @@
 	import DetailModal from '#lib/components/DetailModal.svelte';
 	import AuthModal from '#lib/components/AuthModal.svelte';
 	import AdminPanel from '#lib/components/AdminPanel.svelte';
+	import ConfirmationModal from '#lib/components/ConfirmationModal.svelte';
 	import Toast from '#lib/components/Toast.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	// Auth & User State
-	let currentUser = $state<User | null>(null);
+	let currentUser = $state<User | null>(data.user ?? null);
 
 	// Main state
-	let currentView = $state<'home' | 'feed' | 'cal' | 'trash' | 'admin'>('home');
-	let entries = $state<JournalEntry[]>([]);
+	let currentView = $state<'home' | 'feed' | 'cal' | 'trash' | 'admin'>(
+		data.user?.role === 'admin' ? 'admin' : 'home'
+	);
+	let entries = $state<JournalEntry[]>(data.initialEntries ?? []);
 	let trashEntries = $state<JournalEntry[]>([]);
-	let stats = $state<JournalStats>({
-		totalEntries: 0,
-		totalWords: 0,
-		activeDays: 0,
-		mostFrequentMood: null,
-		last7Days: []
-	});
-	let tags = $state<Array<{ tag: string; count: number }>>([]);
-	let onThisDay = $state<JournalEntry | null>(null);
+	let stats = $state<JournalStats>(
+		data.stats ?? {
+			totalEntries: 0,
+			totalWords: 0,
+			activeDays: 0,
+			mostFrequentMood: null,
+			last7Days: []
+		}
+	);
+	let tags = $state<Array<{ tag: string; count: number }>>(data.tags ?? []);
+	let onThisDay = $state<JournalEntry | null>(data.onThisDay ?? null);
 
 	$effect(() => {
-		if (data.user !== undefined) currentUser = data.user;
+		if (data.user !== undefined) {
+			currentUser = data.user;
+			if (data.user?.role === 'admin') {
+				currentView = 'admin';
+			}
+		}
 		if (data.initialEntries) entries = data.initialEntries;
 		if (data.stats) stats = data.stats;
 		if (data.tags) tags = data.tags;
@@ -55,7 +65,7 @@
 
 	// Initial fetch for trash count & sync
 	async function refreshData(view?: 'active' | 'trash' | 'all') {
-		if (!currentUser) return;
+		if (!currentUser || currentUser.role === 'admin') return;
 		try {
 			// Fetch active entries & stats
 			const res = await fetch('/api/entries?view=active');
@@ -80,8 +90,10 @@
 
 	function handleAuthSuccess(user: User) {
 		currentUser = user;
-		currentView = 'home';
-		refreshData();
+		currentView = user.role === 'admin' ? 'admin' : 'home';
+		if (user.role !== 'admin') {
+			refreshData();
+		}
 	}
 
 	async function handleLogout() {
@@ -214,35 +226,101 @@
 		}
 	}
 
-	async function handlePurge(id: string) {
-		if (!confirm('Are you sure you want to permanently delete this entry? This cannot be undone.')) {
-			return;
-		}
-		const res = await fetch(`/api/entries/${id}`, {
-			method: 'DELETE'
-		});
-		if (res.ok) {
-			activeEntry = null;
-			await refreshData();
-			toast.show('Entry permanently deleted', 'danger');
-		} else {
-			toast.show('Failed to delete entry', 'danger');
+	// Confirmation Modal state
+	let confirmState = $state<{
+		open: boolean;
+		title: string;
+		message: string;
+		confirmText: string;
+		cancelText?: string;
+		variant: 'danger' | 'warning' | 'primary';
+		isLoading: boolean;
+		action: () => Promise<void>;
+	}>({
+		open: false,
+		title: '',
+		message: '',
+		confirmText: 'Confirm',
+		cancelText: 'Cancel',
+		variant: 'danger',
+		isLoading: false,
+		action: async () => {}
+	});
+
+	function promptConfirm(opts: {
+		title: string;
+		message: string;
+		confirmText?: string;
+		cancelText?: string;
+		variant?: 'danger' | 'warning' | 'primary';
+		action: () => Promise<void>;
+	}) {
+		confirmState = {
+			open: true,
+			title: opts.title,
+			message: opts.message,
+			confirmText: opts.confirmText || 'Confirm',
+			cancelText: opts.cancelText || 'Cancel',
+			variant: opts.variant || 'danger',
+			isLoading: false,
+			action: opts.action
+		};
+	}
+
+	function closeConfirm() {
+		if (confirmState.isLoading) return;
+		confirmState.open = false;
+	}
+
+	async function runConfirmAction() {
+		confirmState.isLoading = true;
+		try {
+			await confirmState.action();
+		} finally {
+			confirmState.isLoading = false;
+			confirmState.open = false;
 		}
 	}
 
-	async function handlePurgeAllTrash() {
-		if (!confirm('Empty all trash permanently? This cannot be undone.')) {
-			return;
-		}
-		const res = await fetch('/api/entries/purge-trash', {
-			method: 'POST'
+	async function handlePurge(id: string) {
+		promptConfirm({
+			title: 'Delete Entry Permanently',
+			message: 'Are you sure you want to permanently delete this entry? This action cannot be undone and cannot be recovered from trash.',
+			confirmText: 'Delete Permanently',
+			variant: 'danger',
+			action: async () => {
+				const res = await fetch(`/api/entries/${id}`, {
+					method: 'DELETE'
+				});
+				if (res.ok) {
+					activeEntry = null;
+					await refreshData();
+					toast.show('Entry permanently deleted', 'danger');
+				} else {
+					toast.show('Failed to delete entry', 'danger');
+				}
+			}
 		});
-		if (res.ok) {
-			await refreshData();
-			toast.show('Trash emptied permanently', 'danger');
-		} else {
-			toast.show('Failed to empty trash', 'danger');
-		}
+	}
+
+	async function handlePurgeAllTrash() {
+		promptConfirm({
+			title: 'Empty All Trash',
+			message: `Are you sure you want to permanently delete all ${trashEntries.length} items in the trash? This action cannot be undone.`,
+			confirmText: 'Empty All Trash',
+			variant: 'danger',
+			action: async () => {
+				const res = await fetch('/api/entries/purge-trash', {
+					method: 'POST'
+				});
+				if (res.ok) {
+					await refreshData();
+					toast.show('Trash emptied permanently', 'danger');
+				} else {
+					toast.show('Failed to empty trash', 'danger');
+				}
+			}
+		});
 	}
 
 	function handleNewEntryClick() {
@@ -279,9 +357,9 @@
 		return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
 	}
 
-	// Initial load refresh for trash count
+	// Initial load refresh for trash count (writers only)
 	$effect(() => {
-		if (currentUser) {
+		if (currentUser && currentUser.role !== 'admin') {
 			refreshData();
 		}
 	});
@@ -306,8 +384,9 @@
 		/>
 
 		<main id="main-content">
-		<!-- 1. DASHBOARD VIEW -->
-		{#if currentView === 'home'}
+		{#if currentUser.role === 'admin'}
+			<AdminPanel {currentUser} />
+		{:else if currentView === 'home'}
 			<div class="bento">
 				<!-- Composer Card -->
 				<section class="card b-write" aria-labelledby="write-label">
@@ -589,8 +668,6 @@
 					{/each}
 				</div>
 			</div>
-		{:else if currentView === 'admin' && currentUser?.role === 'admin'}
-			<AdminPanel />
 		{/if}
 	</main>
 </div>
@@ -605,6 +682,19 @@
 	onRestore={handleRestore}
 	onPurge={handlePurge}
 	onTagClick={filterByTag}
+/>
+
+<!-- Confirmation Modal -->
+<ConfirmationModal
+	open={confirmState.open}
+	title={confirmState.title}
+	message={confirmState.message}
+	confirmText={confirmState.confirmText}
+	cancelText={confirmState.cancelText}
+	variant={confirmState.variant}
+	isLoading={confirmState.isLoading}
+	onConfirm={runConfirmAction}
+	onCancel={closeConfirm}
 />
 
 <!-- Toast Notifications -->

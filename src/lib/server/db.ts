@@ -253,8 +253,9 @@ autoPurgeExpiredTrash();
 seedUsersAndInitialData();
 
 export function getUserByUsername(username: string): (User & { passwordHash: string }) | null {
-	const stmt = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)');
-	const row = stmt.get(username) as unknown as RawUserRow | undefined;
+	const clean = username.trim().toLowerCase();
+	const stmt = db.prepare('SELECT * FROM users WHERE LOWER(username) = ?');
+	const row = stmt.get(clean) as unknown as RawUserRow | undefined;
 	if (!row) return null;
 	return {
 		...mapUser(row),
@@ -299,46 +300,78 @@ export function createUser(data: {
 	};
 }
 
-export function adminResetUserPassword(userId: string, newPassword: string): boolean {
+export function adminResetUserPassword(userId: string, newPassword: string, keepSessionToken?: string): boolean {
 	const passwordHash = hashPassword(newPassword);
 	const updated = Date.now();
 
 	const stmt = db.prepare('UPDATE users SET passwordHash = ?, updated = ? WHERE id = ?');
 	const result = stmt.run(passwordHash, updated, userId);
 
-	// Also clear active sessions so user must log in with new password
-	deleteUserSessions(userId);
+	// Also clear active sessions so user must log in with new password (preserving current admin session if resetting own password)
+	if (keepSessionToken) {
+		db.prepare('DELETE FROM sessions WHERE userId = ? AND id != ?').run(userId, keepSessionToken);
+	} else {
+		deleteUserSessions(userId);
+	}
 
 	return Number(result.changes) > 0;
 }
 
+export function updateUser(
+	userId: string,
+	data: { displayName?: string; role?: UserRole }
+): User | null {
+	const user = getUserById(userId);
+	if (!user) return null;
+
+	const displayName = data.displayName !== undefined ? data.displayName.trim() : user.displayName;
+	const role = data.role !== undefined ? data.role : user.role;
+	const updated = Date.now();
+
+	const stmt = db.prepare(`
+		UPDATE users
+		SET displayName = ?, role = ?, updated = ?
+		WHERE id = ?
+	`);
+	stmt.run(displayName, role, updated, userId);
+
+	return {
+		...user,
+		displayName,
+		role,
+		updated
+	};
+}
+
+export function deleteUser(userId: string): boolean {
+	db.prepare('DELETE FROM sessions WHERE userId = ?').run(userId);
+	db.prepare('DELETE FROM entries WHERE userId = ?').run(userId);
+	const result = db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+	return Number(result.changes) > 0;
+}
+
 export function getAllUsersWithStats(): UserWithStats[] {
-	const usersStmt = db.prepare('SELECT * FROM users ORDER BY created ASC');
+	const usersStmt = db.prepare('SELECT id, username, displayName, role, created, updated FROM users ORDER BY created ASC');
 	const userRows = usersStmt.all() as unknown as RawUserRow[];
 
-	const entriesStmt = db.prepare(`
-		SELECT userId, content, created FROM entries WHERE deleted IS NULL
+	const sessionStmt = db.prepare(`
+		SELECT userId, MAX(expiresAt) as latestSession FROM sessions GROUP BY userId
 	`);
-	const entriesRows = entriesStmt.all() as unknown as Array<{ userId: string; content: string; created: number }>;
-
-	const statsByUser = new Map<string, { entryCount: number; wordCount: number; lastActive: number | null }>();
-
-	for (const e of entriesRows) {
-		const stats = statsByUser.get(e.userId) || { entryCount: 0, wordCount: 0, lastActive: null };
-		stats.entryCount += 1;
-		stats.wordCount += e.content.split(/\s+/).filter(Boolean).length;
-		if (!stats.lastActive || e.created > stats.lastActive) {
-			stats.lastActive = e.created;
-		}
-		statsByUser.set(e.userId, stats);
+	const sessionRows = sessionStmt.all() as unknown as Array<{ userId: string; latestSession: number }>;
+	const sessionMap = new Map<string, number>();
+	for (const s of sessionRows) {
+		sessionMap.set(s.userId, Number(s.latestSession));
 	}
 
 	return userRows.map((row) => {
 		const user = mapUser(row);
-		const userStats = statsByUser.get(user.id) || { entryCount: 0, wordCount: 0, lastActive: null };
+		const hasSession = sessionMap.has(user.id);
+		const lastActive = user.updated > user.created ? user.updated : (hasSession ? user.created : null);
 		return {
 			...user,
-			...userStats
+			entryCount: 0,
+			wordCount: 0,
+			lastActive
 		};
 	});
 }
@@ -357,7 +390,7 @@ export function createSession(userId: string): { token: string; expiresAt: numbe
 
 export function validateSession(token: string): User | null {
 	const stmt = db.prepare(`
-		SELECT s.expiresAt, u.*
+		SELECT u.id, u.username, u.displayName, u.role, u.created, u.updated, s.expiresAt
 		FROM sessions s
 		JOIN users u ON s.userId = u.id
 		WHERE s.id = ?

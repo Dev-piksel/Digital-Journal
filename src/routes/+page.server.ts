@@ -25,6 +25,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	}
 
+	if (user.role === 'admin') {
+		return {
+			user,
+			initialEntries: [],
+			stats: {
+				totalEntries: 0,
+				totalWords: 0,
+				activeDays: 0,
+				mostFrequentMood: null,
+				last7Days: []
+			},
+			tags: [],
+			onThisDay: null
+		};
+	}
+
 	const entries = getAllEntries(user.id, { view: 'active' });
 	const stats = getJournalStats(user.id);
 	const tags = getTagsSummary(user.id);

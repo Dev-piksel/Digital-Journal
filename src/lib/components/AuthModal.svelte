@@ -150,11 +150,11 @@
 
 	<form onsubmit={handleSubmit} class="auth-form">
 		<div class="form-group">
-			<label for="auth-username">Username</label>
+			<label for="auth-username">Username or Email</label>
 			<input
 				type="text"
 				id="auth-username"
-				placeholder="e.g. alex or admin"
+				placeholder="e.g. alex or name@email.com"
 				bind:value={username}
 				required
 				autocomplete="username"

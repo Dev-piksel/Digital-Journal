@@ -12,9 +12,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			return json({ error: 'Username must be at least 3 characters long.' }, { status: 400 });
 		}
 
-		if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+		if (!/^[a-zA-Z0-9._@+-]+$/.test(cleanUsername)) {
 			return json(
-				{ error: 'Username can only contain letters, numbers, underscores, and hyphens.' },
+				{ error: 'Username can only contain letters, numbers, and . _ @ + - characters.' },
 				{ status: 400 }
 			);
 		}

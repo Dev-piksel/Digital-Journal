@@ -13,12 +13,20 @@ export function hashPassword(password: string): string {
  * Verify a plain-text password against a stored salt:hash string
  */
 export function verifyPassword(password: string, storedHash: string): boolean {
-	const [salt, key] = storedHash.split(':');
-	if (!salt || !key) return false;
+	try {
+		if (!password || !storedHash) return false;
+		const [salt, key] = storedHash.split(':');
+		if (!salt || !key) return false;
 
-	const derivedKey = crypto.scryptSync(password, salt, 64);
-	const keyBuffer = Buffer.from(key, 'hex');
-	return crypto.timingSafeEqual(derivedKey, keyBuffer);
+		const derivedKey = crypto.scryptSync(password, salt, 64);
+		const keyBuffer = Buffer.from(key, 'hex');
+		if (derivedKey.length !== keyBuffer.length) {
+			return false;
+		}
+		return crypto.timingSafeEqual(derivedKey, keyBuffer);
+	} catch {
+		return false;
+	}
 }
 
 /**

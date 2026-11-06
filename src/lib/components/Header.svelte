@@ -50,84 +50,87 @@
 	<div class="brand-section">
 		<h1>
 			Journal
-			<span class="live-date">· {todayString}</span>
+			{#if user?.role === 'admin'}
+				<span class="admin-console-title">· Admin Console</span>
+			{:else}
+				<span class="live-date">· {todayString}</span>
+			{/if}
 		</h1>
 	</div>
 
-	<nav class="nav-tabs" aria-label="Main navigation">
-		<button
-			class="tab {currentView === 'home' ? 'on' : ''}"
-			onclick={() => onSelectView('home')}
-		>
+	{#if user?.role === 'admin'}
+		<div class="admin-nav-indicator">
 			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<rect x="3" y="3" width="7" height="7"></rect>
-				<rect x="14" y="3" width="7" height="7"></rect>
-				<rect x="14" y="14" width="7" height="7"></rect>
-				<rect x="3" y="14" width="7" height="7"></rect>
+				<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
 			</svg>
-			<span>Dashboard</span>
-		</button>
-		<button
-			class="tab {currentView === 'feed' ? 'on' : ''}"
-			onclick={() => onSelectView('feed')}
-		>
-			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<line x1="8" y1="6" x2="21" y2="6"></line>
-				<line x1="8" y1="12" x2="21" y2="12"></line>
-				<line x1="8" y1="18" x2="21" y2="18"></line>
-				<line x1="3" y1="6" x2="3.01" y2="6"></line>
-				<line x1="3" y1="12" x2="3.01" y2="12"></line>
-				<line x1="3" y1="18" x2="3.01" y2="18"></line>
-			</svg>
-			<span>Entries</span>
-		</button>
-		<button
-			class="tab {currentView === 'cal' ? 'on' : ''}"
-			onclick={() => onSelectView('cal')}
-		>
-			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-				<line x1="16" y1="2" x2="16" y2="6"></line>
-				<line x1="8" y1="2" x2="8" y2="6"></line>
-				<line x1="3" y1="10" x2="21" y2="10"></line>
-			</svg>
-			<span>Calendar</span>
-		</button>
-		<button
-			class="tab {currentView === 'trash' ? 'on' : ''}"
-			onclick={() => onSelectView('trash')}
-		>
-			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<polyline points="3 6 5 6 21 6"></polyline>
-				<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-			</svg>
-			<span>Trash</span>
-			{#if trashCount > 0}
-				<span class="tab-badge">{trashCount}</span>
-			{/if}
-		</button>
-
-		{#if user?.role === 'admin'}
+			<span>User Account Management</span>
+		</div>
+	{:else}
+		<nav class="nav-tabs" aria-label="Main navigation">
 			<button
-				class="tab admin-tab {currentView === 'admin' ? 'on' : ''}"
-				onclick={() => onSelectView('admin')}
+				class="tab {currentView === 'home' ? 'on' : ''}"
+				onclick={() => onSelectView('home')}
 			>
 				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+					<rect x="3" y="3" width="7" height="7"></rect>
+					<rect x="14" y="3" width="7" height="7"></rect>
+					<rect x="14" y="14" width="7" height="7"></rect>
+					<rect x="3" y="14" width="7" height="7"></rect>
 				</svg>
-				<span>Admin</span>
+				<span>Dashboard</span>
 			</button>
-		{/if}
-	</nav>
+			<button
+				class="tab {currentView === 'feed' ? 'on' : ''}"
+				onclick={() => onSelectView('feed')}
+			>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="8" y1="6" x2="21" y2="6"></line>
+					<line x1="8" y1="12" x2="21" y2="12"></line>
+					<line x1="8" y1="18" x2="21" y2="18"></line>
+					<line x1="3" y1="6" x2="3.01" y2="6"></line>
+					<line x1="3" y1="12" x2="3.01" y2="12"></line>
+					<line x1="3" y1="18" x2="3.01" y2="18"></line>
+				</svg>
+				<span>Entries</span>
+			</button>
+			<button
+				class="tab {currentView === 'cal' ? 'on' : ''}"
+				onclick={() => onSelectView('cal')}
+			>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+					<line x1="16" y1="2" x2="16" y2="6"></line>
+					<line x1="8" y1="2" x2="8" y2="6"></line>
+					<line x1="3" y1="10" x2="21" y2="10"></line>
+				</svg>
+				<span>Calendar</span>
+			</button>
+			<button
+				class="tab {currentView === 'trash' ? 'on' : ''}"
+				onclick={() => onSelectView('trash')}
+			>
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="3 6 5 6 21 6"></polyline>
+					<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+				</svg>
+				<span>Trash</span>
+				{#if trashCount > 0}
+					<span class="tab-badge">{trashCount}</span>
+				{/if}
+			</button>
+		</nav>
+	{/if}
 
 	<div class="header-actions">
-		<button class="btn pri new-entry-btn" onclick={onNewEntry} title="Create a new entry">
-			<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-				<line x1="12" y1="5" x2="12" y2="19"></line>
-				<line x1="5" y1="12" x2="19" y2="12"></line>
-			</svg>
-			<span class="btn-text">New Entry</span>
-		</button>
+		{#if user?.role !== 'admin'}
+			<button class="btn pri new-entry-btn" onclick={onNewEntry} title="Create a new entry">
+				<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="12" y1="5" x2="12" y2="19"></line>
+					<line x1="5" y1="12" x2="19" y2="12"></line>
+				</svg>
+				<span class="btn-text">New Entry</span>
+			</button>
+		{/if}
 
 		<button class="btn icon-only theme-btn" onclick={toggleTheme} title="Toggle Dark / Light Theme" aria-label="Toggle theme">
 			{#if isDark}
@@ -188,6 +191,27 @@
 
 	.admin-tab.on {
 		color: var(--ac);
+	}
+
+	.admin-nav-indicator {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 16px;
+		background: rgba(201, 167, 124, 0.12);
+		border: 1px solid rgba(201, 167, 124, 0.3);
+		border-radius: 999px;
+		color: var(--ac);
+		font-size: 13px;
+		font-weight: 600;
+		justify-self: center;
+	}
+
+	.admin-console-title {
+		font-size: 16px;
+		color: var(--ac);
+		font-family: inherit;
+		font-weight: 600;
 	}
 
 	.header-actions {
